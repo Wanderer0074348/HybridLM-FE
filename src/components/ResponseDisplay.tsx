@@ -62,12 +62,18 @@ export function ResponseDisplay({ response }: ResponseDisplayProps) {
                 remarkPlugins={[remarkGfm]}
                 components={{
                   p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />,
-                  code: ({node, inline, ...props}) =>
-                    inline ? (
-                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props} />
+                  code: ({node, className, children, ...props}) => {
+                    const isInline = !className?.includes('language-');
+                    return isInline ? (
+                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>
+                        {children}
+                      </code>
                     ) : (
-                      <code className="block bg-gray-800 p-4 rounded-lg overflow-x-auto" {...props} />
-                    ),
+                      <code className={`block bg-gray-800 p-4 rounded-lg overflow-x-auto ${className || ''}`} {...props}>
+                        {children}
+                      </code>
+                    );
+                  },
                   pre: ({node, ...props}) => <pre className="my-4" {...props} />,
                 }}
               >
