@@ -57,34 +57,22 @@ export default function Home() {
         <ErrorMessage message={error} />
 
         {/* Routing Visualization */}
-        <AnimatePresence mode="wait">
-          {(isLoading || currentResponse) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <RoutingVisualization
-                response={currentResponse!}
-                isLoading={isLoading}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {(isLoading || currentResponse) && (
+          <RoutingVisualization
+            response={currentResponse!}
+            isLoading={isLoading}
+          />
+        )}
 
         {/* Response Display */}
-        <AnimatePresence mode="wait">
-          {currentResponse && !isLoading && (
-            <ResponseDisplay response={currentResponse} />
-          )}
-        </AnimatePresence>
+        {currentResponse && !isLoading && (
+          <ResponseDisplay response={currentResponse} />
+        )}
 
         {/* Flow Diagram */}
-        <AnimatePresence mode="wait">
-          {currentResponse && !isLoading && (
-            <FlowDiagram response={currentResponse} />
-          )}
-        </AnimatePresence>
+        {currentResponse && !isLoading && (
+          <FlowDiagram response={currentResponse} />
+        )}
 
         {/* Statistics */}
         {responses.length > 0 && (
