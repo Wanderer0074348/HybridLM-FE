@@ -7,6 +7,7 @@ import { ResponseDisplay } from '@/components/ResponseDisplay';
 import { RoutingVisualization } from '@/components/RoutingVisualization';
 import { FlowDiagram } from '@/components/FlowDiagram';
 import { Statistics } from '@/components/Statistics';
+import { CostDashboard } from '@/components/CostDashboard';
 import { Header } from '@/components/layout/Header';
 import { Hero } from '@/components/layout/Hero';
 import { Features } from '@/components/layout/Features';
@@ -74,9 +75,16 @@ export default function Home() {
           <FlowDiagram response={currentResponse} />
         )}
 
-        {/* Statistics */}
+        {/* Cost Dashboard */}
         {responses.length > 0 && (
           <div className="pt-8 border-t border-gray-800/50">
+            <CostDashboard responses={responses} />
+          </div>
+        )}
+
+        {/* Statistics */}
+        {responses.length > 0 && (
+          <div className="pt-8">
             <Statistics responses={responses} />
           </div>
         )}

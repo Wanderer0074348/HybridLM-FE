@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { InferenceResponse } from '@/types/api';
 import { Clock, Database, Cpu, Cloud, CheckCircle2, XCircle } from 'lucide-react';
+import { CostMetrics } from './CostMetrics';
 
 interface ResponseDisplayProps {
   response: InferenceResponse;
@@ -14,6 +15,10 @@ export function ResponseDisplay({ response }: ResponseDisplayProps) {
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4">
+      {/* Cost Metrics - Show first if available */}
+      {response.cost_metrics && (
+        <CostMetrics metrics={response.cost_metrics} cacheHit={response.cache_hit} />
+      )}
       {/* Response Content */}
       <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-2xl border border-gray-700/50 p-6 backdrop-blur-sm">
         <div className="flex items-start gap-4">
@@ -52,8 +57,20 @@ export function ResponseDisplay({ response }: ResponseDisplayProps) {
                 prose-table:border-collapse prose-table:w-full
                 prose-th:border prose-th:border-gray-700 prose-th:bg-gray-800 prose-th:p-2 prose-th:text-gray-200
                 prose-td:border prose-td:border-gray-700 prose-td:p-2 prose-td:text-gray-200
-                break-words overflow-wrap-anywhere">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                break-words overflow-wrap-anywhere whitespace-pre-wrap">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />,
+                  code: ({node, inline, ...props}) =>
+                    inline ? (
+                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props} />
+                    ) : (
+                      <code className="block bg-gray-800 p-4 rounded-lg overflow-x-auto" {...props} />
+                    ),
+                  pre: ({node, ...props}) => <pre className="my-4" {...props} />,
+                }}
+              >
                 {response.response}
               </ReactMarkdown>
             </div>
