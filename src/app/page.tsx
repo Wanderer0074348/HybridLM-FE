@@ -16,6 +16,7 @@ import { BackgroundEffects } from '@/components/layout/BackgroundEffects';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { apiClient } from '@/lib/api';
 import { InferenceResponse } from '@/types/api';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -39,20 +40,21 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white relative overflow-hidden">
-      {/* Animated Background */}
-      <BackgroundEffects />
+    <ProtectedRoute>
+      <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white relative overflow-hidden">
+        {/* Animated Background */}
+        <BackgroundEffects />
 
-      {/* Header */}
-      <Header />
+        {/* Header */}
+        <Header />
 
-      {/* Main Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 space-y-12">
-        {/* Hero Section */}
-        <Hero />
+        {/* Main Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 space-y-12">
+          {/* Hero Section */}
+          <Hero />
 
-        {/* Query Input */}
-        <QueryInput onSubmit={handleQuery} isLoading={isLoading} />
+          {/* Query Input */}
+          <QueryInput onSubmit={handleQuery} isLoading={isLoading} />
 
         {/* Error Display */}
         <ErrorMessage message={error} />
@@ -93,8 +95,9 @@ export default function Home() {
         {responses.length === 0 && <Features />}
       </div>
 
-      {/* Footer */}
-      <Footer />
-    </main>
+        {/* Footer */}
+        <Footer />
+      </main>
+    </ProtectedRoute>
   );
 }

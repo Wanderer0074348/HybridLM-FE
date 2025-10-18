@@ -6,6 +6,11 @@ import {
   ChatResponse,
   ChatSession
 } from '@/types/api';
+import {
+  LoginResponse,
+  MeResponse,
+  LogoutResponse
+} from '@/types/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -16,12 +21,22 @@ export class APIClient {
     this.baseURL = baseURL;
   }
 
+  private async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    return fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
+  }
+
   async inference(request: InferenceRequest): Promise<InferenceResponse> {
-    const response = await fetch(`${this.baseURL}/inference`, {
+    const response = await this.fetchWithAuth(`${this.baseURL}/inference`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(request),
     });
 
@@ -43,13 +58,9 @@ export class APIClient {
     return response.json();
   }
 
-  // Chat methods
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    const response = await fetch(`${this.baseURL}/chat`, {
+    const response = await this.fetchWithAuth(`${this.baseURL}/chat`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(request),
     });
 
@@ -62,7 +73,7 @@ export class APIClient {
   }
 
   async getSession(sessionId: string): Promise<ChatSession> {
-    const response = await fetch(`${this.baseURL}/chat/sessions/${sessionId}`);
+    const response = await this.fetchWithAuth(`${this.baseURL}/chat/sessions/${sessionId}`);
 
     if (!response.ok) {
       throw new Error('Failed to get session');
@@ -72,7 +83,7 @@ export class APIClient {
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    const response = await fetch(`${this.baseURL}/chat/sessions/${sessionId}`, {
+    const response = await this.fetchWithAuth(`${this.baseURL}/chat/sessions/${sessionId}`, {
       method: 'DELETE',
     });
 
@@ -82,10 +93,42 @@ export class APIClient {
   }
 
   async listSessions(): Promise<{ sessions: string[]; count: number }> {
-    const response = await fetch(`${this.baseURL}/chat/sessions`);
+    const response = await this.fetchWithAuth(`${this.baseURL}/chat/sessions`);
 
     if (!response.ok) {
       throw new Error('Failed to list sessions');
+    }
+
+    return response.json();
+  }
+
+  async login(): Promise<LoginResponse> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/auth/login`);
+
+    if (!response.ok) {
+      throw new Error('Failed to initiate login');
+    }
+
+    return response.json();
+  }
+
+  async me(): Promise<MeResponse> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/auth/me`);
+
+    if (!response.ok) {
+      throw new Error('Not authenticated');
+    }
+
+    return response.json();
+  }
+
+  async logout(): Promise<LogoutResponse> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/auth/logout`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      throw new Error('Logout failed');
     }
 
     return response.json();

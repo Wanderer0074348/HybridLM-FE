@@ -4,10 +4,14 @@ import { motion } from 'framer-motion';
 import { Sparkles, Github, ExternalLink, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import UserMenu from '@/components/auth/UserMenu';
+import LoginButton from '@/components/auth/LoginButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Header() {
   const pathname = usePathname();
   const isChat = pathname === '/chat';
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
     <motion.header
@@ -57,9 +61,13 @@ export function Header() {
               whileTap={{ scale: 0.95 }}
             >
               <Github className="w-4 h-4" />
-              View on GitHub
+              <span className="hidden sm:inline">View on GitHub</span>
               <ExternalLink className="w-3 h-3" />
             </motion.a>
+
+            {!isLoading && (
+              isAuthenticated ? <UserMenu /> : <LoginButton />
+            )}
           </div>
         </div>
       </div>
