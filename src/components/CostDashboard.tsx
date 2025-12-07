@@ -22,8 +22,9 @@ export function CostDashboard({ responses }: CostDashboardProps) {
         totalSavings += resp.cost_metrics.estimated_savings;
       }
       if (resp.cache_hit) cacheHits++;
-      if (resp.model_used === 'cloud-llm') llmCalls++;
-      else slmCalls++;
+      // Check if model_used is "edge-slm" to count as SLM, otherwise count as LLM
+      if (resp.model_used === 'edge-slm') slmCalls++;
+      else llmCalls++;
     });
 
     const cacheHitRate = responses.length > 0 ? (cacheHits / responses.length) * 100 : 0;

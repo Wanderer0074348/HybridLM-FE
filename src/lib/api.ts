@@ -4,7 +4,15 @@ import {
   HealthCheckResponse,
   ChatRequest,
   ChatResponse,
-  ChatSession
+  ChatSession,
+  SessionMetadata,
+  FeedbackRequest,
+  FeedbackResponse,
+  RoutingDecisionRecord,
+  ABTestConfig,
+  ABTestMetrics,
+  CreateABTestRequest,
+  MLTrainingResponse
 } from '@/types/api';
 import {
   LoginResponse,
@@ -34,7 +42,7 @@ export class APIClient {
     });
   }
 
-  async inference(request: InferenceRequest): Promise<InferenceResponse> {
+  async inference(request: InferenceRequest): Promise<{ data: InferenceResponse; decisionId?: string }> {
     const response = await this.fetchWithAuth(`${this.baseURL}/inference`, {
       method: 'POST',
       body: JSON.stringify(request),
@@ -45,7 +53,10 @@ export class APIClient {
       throw new Error(error.error || 'Inference request failed');
     }
 
-    return response.json();
+    const decisionId = response.headers.get('X-Decision-ID') || undefined;
+    const data = await response.json();
+
+    return { data, decisionId };
   }
 
   async healthCheck(): Promise<HealthCheckResponse> {
@@ -58,7 +69,7 @@ export class APIClient {
     return response.json();
   }
 
-  async chat(request: ChatRequest): Promise<ChatResponse> {
+  async chat(request: ChatRequest): Promise<{ data: ChatResponse; decisionId?: string }> {
     const response = await this.fetchWithAuth(`${this.baseURL}/chat`, {
       method: 'POST',
       body: JSON.stringify(request),
@@ -69,7 +80,10 @@ export class APIClient {
       throw new Error(error.error || 'Chat request failed');
     }
 
-    return response.json();
+    const decisionId = response.headers.get('X-Decision-ID') || undefined;
+    const data = await response.json();
+
+    return { data, decisionId };
   }
 
   async getSession(sessionId: string): Promise<ChatSession> {
@@ -92,7 +106,7 @@ export class APIClient {
     }
   }
 
-  async listSessions(): Promise<{ sessions: string[]; count: number }> {
+  async listSessions(): Promise<{ sessions: SessionMetadata[] | string[]; count: number }> {
     const response = await this.fetchWithAuth(`${this.baseURL}/chat/sessions`);
 
     if (!response.ok) {
@@ -129,6 +143,101 @@ export class APIClient {
 
     if (!response.ok) {
       throw new Error('Logout failed');
+    }
+
+    return response.json();
+  }
+
+  // Feedback methods
+  async submitFeedback(feedback: FeedbackRequest): Promise<FeedbackResponse> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify(feedback),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to submit feedback');
+    }
+
+    return response.json();
+  }
+
+  async getDecision(decisionId: string): Promise<RoutingDecisionRecord> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/decisions/${decisionId}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to get decision');
+    }
+
+    return response.json();
+  }
+
+  // A/B Testing methods
+  async createABTest(config: CreateABTestRequest): Promise<ABTestConfig> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/ab-tests`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create A/B test');
+    }
+
+    return response.json();
+  }
+
+  async getActiveABTest(): Promise<ABTestConfig | null> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/ab-tests/active`);
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error('Failed to get active A/B test');
+    }
+
+    return response.json();
+  }
+
+  async endABTest(testId: string): Promise<{ message: string }> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/ab-tests/${testId}/end`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to end A/B test');
+    }
+
+    return response.json();
+  }
+
+  async getABTestMetrics(group?: 'control' | 'treatment'): Promise<ABTestMetrics[]> {
+    const url = group
+      ? `${this.baseURL}/ab-tests/metrics?group=${group}`
+      : `${this.baseURL}/ab-tests/metrics`;
+
+    const response = await this.fetchWithAuth(url);
+
+    if (!response.ok) {
+      throw new Error('Failed to get A/B test metrics');
+    }
+
+    return response.json();
+  }
+
+  // ML Training methods
+  async trainMLModel(): Promise<MLTrainingResponse> {
+    const response = await this.fetchWithAuth(`${this.baseURL}/ml/train`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to train ML model');
     }
 
     return response.json();

@@ -25,7 +25,8 @@ export function Statistics({ responses }: StatisticsProps) {
       responses.reduce((sum, r) => sum + r.latency, 0) / totalQueries / 1000000;
     const cacheHits = responses.filter((r) => r.cache_hit).length;
     const cacheHitRate = (cacheHits / totalQueries) * 100;
-    const llmUsage = responses.filter((r) => r.model_used === 'cloud-llm').length;
+    // Check if model_used is NOT "edge-slm" to count as LLM (handles "cloud-llm" and other LLM models)
+    const llmUsage = responses.filter((r) => r.model_used !== 'edge-slm').length;
     const llmUsageRate = (llmUsage / totalQueries) * 100;
 
     return {

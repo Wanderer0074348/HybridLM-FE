@@ -2,16 +2,24 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, BarChart3, Clock, Zap } from 'lucide-react';
+import { BarChart3, Clock, Zap } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { apiClient } from '@/lib/api';
 import { ChatMessage as ChatMessageType, ChatResponse } from '@/types/api';
+import { useAnalytics } from '@/contexts/AnalyticsContext';
 
-export function ChatInterface() {
-  const [sessionId, setSessionId] = useState<string | null>(null);
+interface ChatInterfaceProps {
+  sessionId?: string | null;
+  onSessionChange?: (sessionId: string) => void;
+}
+
+export function ChatInterface({ sessionId: propSessionId, onSessionChange }: ChatInterfaceProps) {
+  const { addResponse } = useAnalytics();
+  const [sessionId, setSessionId] = useState<string | null>(propSessionId || null);
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     totalMessages: 0,
@@ -23,10 +31,49 @@ export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatResponses = useRef<ChatResponse[]>([]);
 
+  // Load session when propSessionId changes
+  useEffect(() => {
+    if (propSessionId && propSessionId !== sessionId) {
+      loadSession(propSessionId);
+    } else if (propSessionId === null && sessionId !== null) {
+      // New chat requested
+      handleNewChat();
+    }
+  }, [propSessionId]);
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const loadSession = async (id: string) => {
+    try {
+      setIsLoadingSession(true);
+      const session = await apiClient.getSession(id);
+
+      // Convert session messages to chat messages
+      const chatMessages: ChatMessageType[] = session.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      }));
+
+      setMessages(chatMessages);
+      setSessionId(id);
+      setStats({
+        totalMessages: session.message_count,
+        totalTokens: session.total_tokens,
+        avgLatency: 0,
+        cacheHits: 0,
+      });
+      chatResponses.current = [];
+    } catch (err) {
+      setError('Failed to load session');
+      console.error('Failed to load session:', err);
+    } finally {
+      setIsLoadingSession(false);
+    }
+  };
 
   const handleSendMessage = async (content: string) => {
     setIsLoading(true);
@@ -42,7 +89,7 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage]);
 
     try {
-      const response = await apiClient.chat({
+      const { data: response, decisionId } = await apiClient.chat({
         session_id: sessionId || undefined,
         message: content,
       });
@@ -50,20 +97,30 @@ export function ChatInterface() {
       // Update session ID if this is the first message
       if (!sessionId) {
         setSessionId(response.session_id);
+        onSessionChange?.(response.session_id);
       }
 
-      // Add assistant message
+      // Add assistant message with metadata
       const assistantMessage: ChatMessageType = {
         role: 'assistant',
         content: response.response,
         timestamp: response.timestamp,
+        metadata: {
+          model_used: response.model_used,
+          routing_reason: response.routing_reason,
+          latency: response.latency,
+          cache_hit: response.cache_hit,
+          cost_metrics: response.cost_metrics,
+          decision_id: decisionId,
+        },
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
 
-      // Update stats
+      // Update stats and analytics
       chatResponses.current.push(response);
       updateStats(response);
+      addResponse(response); // Save to analytics
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
       // Remove the optimistic user message on error
@@ -87,97 +144,42 @@ export function ChatInterface() {
   };
 
   const handleNewChat = () => {
-    if (window.confirm('Start a new conversation? This will clear the current chat.')) {
-      setSessionId(null);
-      setMessages([]);
-      chatResponses.current = [];
-      setStats({
-        totalMessages: 0,
-        totalTokens: 0,
-        avgLatency: 0,
-        cacheHits: 0,
-      });
-    }
-  };
-
-  const handleDeleteSession = async () => {
-    if (!sessionId) return;
-
-    if (window.confirm('Delete this conversation permanently?')) {
-      try {
-        await apiClient.deleteSession(sessionId);
-        handleNewChat();
-      } catch (err) {
-        setError('Failed to delete session');
-      }
-    }
+    setSessionId(null);
+    setMessages([]);
+    chatResponses.current = [];
+    setStats({
+      totalMessages: 0,
+      totalTokens: 0,
+      avgLatency: 0,
+      cacheHits: 0,
+    });
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-800/50">
-        <div>
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-            Chat with HybridLM
-          </h2>
-          <p className="text-sm text-gray-400 mt-1">
-            Context-aware conversational AI
-            {sessionId && (
-              <span className="ml-2 text-emerald-500">
-                • Session: {sessionId.slice(0, 8)}...
-              </span>
-            )}
-          </p>
+    <div className="flex flex-col h-[calc(100vh-100px)] max-w-5xl mx-auto">
+      {/* Simple Header with Stats */}
+      {messages.length > 0 && (
+        <div className="flex items-center justify-end mb-4 pb-3 border-b border-gray-800/50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-4 text-xs text-gray-400 bg-gray-800/50 rounded-lg px-4 py-2 border border-gray-700/50"
+          >
+            <div className="flex items-center gap-1">
+              <BarChart3 className="w-4 h-4 text-gray-400" />
+              <span>{stats.totalMessages} msgs</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span>{stats.avgLatency.toFixed(2)}s avg</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Zap className="w-4 h-4 text-gray-400" />
+              <span>{stats.cacheHits} cached</span>
+            </div>
+          </motion.div>
         </div>
-
-        {/* Stats and Actions */}
-        <div className="flex items-center gap-3">
-          {messages.length > 0 && (
-            <>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-4 text-xs text-gray-400 bg-gray-800/50 rounded-lg px-4 py-2 border border-gray-700/50"
-              >
-                <div className="flex items-center gap-1">
-                  <BarChart3 className="w-4 h-4 text-emerald-400" />
-                  <span>{stats.totalMessages} msgs</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4 text-blue-400" />
-                  <span>{stats.avgLatency.toFixed(2)}s avg</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Zap className="w-4 h-4 text-yellow-400" />
-                  <span>{stats.cacheHits} cached</span>
-                </div>
-              </motion.div>
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleDeleteSession}
-                className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
-                title="Delete conversation"
-              >
-                <Trash2 className="w-4 h-4" />
-              </motion.button>
-            </>
-          )}
-
-          {messages.length > 0 && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleNewChat}
-              className="px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-sm font-medium"
-            >
-              New Chat
-            </motion.button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Error Message */}
       <AnimatePresence>
@@ -195,9 +197,14 @@ export function ChatInterface() {
 
       {/* Messages Container */}
       <div className="flex-1 overflow-y-auto mb-6 space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
-        {messages.length === 0 ? (
+        {isLoadingSession ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="w-12 h-12 border-4 border-gray-500 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-gray-400">Loading conversation...</p>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-full flex items-center justify-center mb-4">
+            <div className="w-20 h-20 bg-gradient-to-br from-gray-700/30 to-gray-600/30 rounded-full flex items-center justify-center mb-4">
               <span className="text-4xl">💬</span>
             </div>
             <h3 className="text-xl font-semibold text-gray-300 mb-2">
@@ -209,15 +216,15 @@ export function ChatInterface() {
             <div className="mt-6 grid grid-cols-2 gap-3 max-w-lg">
               <button
                 onClick={() => handleSendMessage('What is machine learning?')}
-                className="p-3 text-left bg-gray-800/50 hover:bg-gray-800 rounded-lg border border-gray-700/50 hover:border-emerald-500/50 transition-colors text-sm"
+                className="p-3 text-left bg-gray-800/50 hover:bg-gray-800 rounded-lg border border-gray-700/50 hover:border-gray-600 transition-colors text-sm"
               >
-                <span className="text-emerald-400">💡</span> What is machine learning?
+                <span className="text-gray-400">💡</span> What is machine learning?
               </button>
               <button
                 onClick={() => handleSendMessage('Explain neural networks simply')}
-                className="p-3 text-left bg-gray-800/50 hover:bg-gray-800 rounded-lg border border-gray-700/50 hover:border-emerald-500/50 transition-colors text-sm"
+                className="p-3 text-left bg-gray-800/50 hover:bg-gray-800 rounded-lg border border-gray-700/50 hover:border-gray-600 transition-colors text-sm"
               >
-                <span className="text-blue-400">🧠</span> Explain neural networks
+                <span className="text-gray-400">🧠</span> Explain neural networks
               </button>
             </div>
           </div>
@@ -236,15 +243,15 @@ export function ChatInterface() {
                 animate={{ opacity: 1 }}
                 className="flex gap-4"
               >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 </div>
                 <div className="flex-1">
                   <div className="inline-block bg-gray-800/80 rounded-2xl px-5 py-3 border border-gray-700/50">
                     <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   </div>
                 </div>

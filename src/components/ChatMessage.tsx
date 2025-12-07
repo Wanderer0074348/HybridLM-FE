@@ -1,10 +1,11 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { User, Bot, Sparkles } from 'lucide-react';
+import { User, Bot, Sparkles, Cpu, Cloud, Database, Clock, DollarSign, ChevronDown, ChevronUp } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage as ChatMessageType } from '@/types/api';
+import { useState } from 'react';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -14,6 +15,9 @@ interface ChatMessageProps {
 export function ChatMessage({ message, isLatest }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+  const [showMetadata, setShowMetadata] = useState(false);
+
+  const hasMetadata = !isUser && !isSystem && message.metadata;
 
   return (
     <motion.div
@@ -87,13 +91,113 @@ export function ChatMessage({ message, isLatest }: ChatMessageProps) {
           )}
         </div>
 
-        {/* Timestamp */}
-        <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
-          {new Date(message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+        {/* Timestamp and Metadata Toggle */}
+        <div className={`flex items-center gap-2 mt-1 text-xs text-gray-500 ${isUser ? 'justify-end' : 'justify-start'}`}>
+          <span>
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          {hasMetadata && (
+            <button
+              onClick={() => setShowMetadata(!showMetadata)}
+              className="flex items-center gap-1 text-gray-500 hover:text-emerald-400 transition-colors"
+            >
+              <span className="text-xs">Details</span>
+              {showMetadata ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          )}
         </div>
+
+        {/* Metadata Panel */}
+        {hasMetadata && showMetadata && message.metadata && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-3 p-3 bg-gray-900/50 border border-gray-700/50 rounded-lg space-y-2"
+          >
+            {/* Model Used */}
+            <div className="flex items-center gap-2 text-xs">
+              {message.metadata.model_used === 'cloud-llm' || message.metadata.model_used?.includes('gpt') ? (
+                <Cloud className="w-4 h-4 text-blue-400" />
+              ) : (
+                <Cpu className="w-4 h-4 text-emerald-400" />
+              )}
+              <span className="text-gray-400">Model:</span>
+              <span className="text-gray-200 font-medium">
+                {message.metadata.model_used === 'cloud-llm'
+                  ? message.metadata.cost_metrics?.model || 'Cloud LLM'
+                  : message.metadata.cost_metrics?.model || 'Edge SLM'}
+              </span>
+              {message.metadata.cache_hit && (
+                <span className="ml-2 px-2 py-0.5 bg-gray-700/50 border border-gray-600/50 rounded text-gray-300 flex items-center gap-1">
+                  <Database className="w-3 h-3" />
+                  Cached
+                </span>
+              )}
+            </div>
+
+            {/* Routing Reason */}
+            {message.metadata.routing_reason && (
+              <div className="flex items-start gap-2 text-xs">
+                <Sparkles className="w-4 h-4 text-purple-400 mt-0.5" />
+                <span className="text-gray-400">Routing:</span>
+                <span className="text-gray-300 flex-1">
+                  {message.metadata.routing_reason}
+                  {(message.metadata.routing_reason.includes('ML model') ||
+                    message.metadata.routing_reason.includes('Exploration')) && (
+                    <span className="ml-2 px-2 py-0.5 bg-purple-700/30 border border-purple-600/50 rounded text-purple-300 text-xs">
+                      RL
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+
+            {/* Performance Metrics */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {message.metadata.latency !== undefined && (
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-400">Latency:</span>
+                  <span className="text-gray-200">{(message.metadata.latency / 1000000).toFixed(0)}ms</span>
+                </div>
+              )}
+
+              {message.metadata.cost_metrics && (
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="w-3 h-3 text-green-400" />
+                  <span className="text-gray-400">Cost:</span>
+                  <span className="text-gray-200">
+                    {message.metadata.cost_metrics.total_cost < 0.0001
+                      ? `$${(message.metadata.cost_metrics.total_cost * 1000000).toFixed(2)}µ`
+                      : `$${message.metadata.cost_metrics.total_cost.toFixed(6)}`}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Cost Savings */}
+            {message.metadata.cost_metrics && message.metadata.cost_metrics.estimated_savings > 0 && (
+              <div className="pt-2 border-t border-gray-700/50 text-xs">
+                <span className="text-green-400">
+                  💰 Saved ${message.metadata.cost_metrics.estimated_savings < 0.0001
+                    ? (message.metadata.cost_metrics.estimated_savings * 1000000).toFixed(2) + 'µ'
+                    : message.metadata.cost_metrics.estimated_savings.toFixed(6)} by using SLM
+                </span>
+              </div>
+            )}
+
+            {/* Token Usage */}
+            {message.metadata.cost_metrics && (
+              <div className="text-xs text-gray-500">
+                Tokens: {message.metadata.cost_metrics.input_tokens} in / {message.metadata.cost_metrics.output_tokens} out
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );
