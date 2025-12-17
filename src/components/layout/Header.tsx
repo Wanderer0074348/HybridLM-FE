@@ -1,13 +1,18 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Sparkles, Github, ExternalLink, MessageSquare } from 'lucide-react';
+import { Sparkles, Github, ExternalLink, MessageSquare, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import UserMenu from '@/components/auth/UserMenu';
+import LoginButton from '@/components/auth/LoginButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Header() {
   const pathname = usePathname();
-  const isChat = pathname === '/chat';
+  const isHome = pathname === '/';
+  const isAnalytics = pathname === '/analytics';
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
     <motion.header
@@ -35,15 +40,15 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-3">
-            {!isChat && (
-              <Link href="/chat">
+            {!isAnalytics && (
+              <Link href="/analytics">
                 <motion.div
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 rounded-lg text-sm transition-colors text-emerald-400"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 rounded-lg text-sm transition-colors text-blue-400"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <MessageSquare className="w-4 h-4" />
-                  Try Chat Mode
+                  <BarChart3 className="w-4 h-4" />
+                  Analytics
                 </motion.div>
               </Link>
             )}
@@ -57,9 +62,13 @@ export function Header() {
               whileTap={{ scale: 0.95 }}
             >
               <Github className="w-4 h-4" />
-              View on GitHub
+              <span className="hidden sm:inline">View on GitHub</span>
               <ExternalLink className="w-3 h-3" />
             </motion.a>
+
+            {!isLoading && (
+              isAuthenticated ? <UserMenu /> : <LoginButton />
+            )}
           </div>
         </div>
       </div>

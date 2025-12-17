@@ -106,8 +106,8 @@ export function ResponseDisplay({ response }: ResponseDisplayProps) {
         />
         <MetricCard
           icon={Database}
-          label="Reason"
-          value={response.routing_reason.split(' ').slice(0, 2).join(' ')}
+          label="Strategy"
+          value={response.routing_reason.includes('ML model') || response.routing_reason.includes('Exploration') ? 'RL' : 'Rule'}
           color="gray"
           tooltip={response.routing_reason}
         />

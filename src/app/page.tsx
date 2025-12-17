@@ -1,100 +1,91 @@
 'use client';
 
-import { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { QueryInput } from '@/components/QueryInput';
-import { ResponseDisplay } from '@/components/ResponseDisplay';
-import { RoutingVisualization } from '@/components/RoutingVisualization';
-import { FlowDiagram } from '@/components/FlowDiagram';
-import { Statistics } from '@/components/Statistics';
-import { CostDashboard } from '@/components/CostDashboard';
-import { Header } from '@/components/layout/Header';
-import { Hero } from '@/components/layout/Hero';
-import { Features } from '@/components/layout/Features';
-import { Footer } from '@/components/layout/Footer';
+import { useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { LogOut, User as UserIcon } from 'lucide-react';
+import { ChatInterface } from '@/components/ChatInterface';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { BackgroundEffects } from '@/components/layout/BackgroundEffects';
-import { ErrorMessage } from '@/components/ui/ErrorMessage';
-import { apiClient } from '@/lib/api';
-import { InferenceResponse } from '@/types/api';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentResponse, setCurrentResponse] = useState<InferenceResponse | null>(null);
-  const [responses, setResponses] = useState<InferenceResponse[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const { user, logout } = useAuth();
 
-  const handleQuery = async (query: string) => {
-    setIsLoading(true);
-    setError(null);
+  const handleNewChat = useCallback(() => {
+    setCurrentSessionId(null);
+  }, []);
 
+  const handleSelectSession = useCallback((sessionId: string) => {
+    setCurrentSessionId(sessionId);
+  }, []);
+
+  const handleLogout = async () => {
     try {
-      const response = await apiClient.inference({ query });
-      setCurrentResponse(response);
-      setResponses((prev) => [response, ...prev]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Logout failed. Please try again.');
     }
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white relative overflow-hidden">
-      {/* Animated Background */}
-      <BackgroundEffects />
+    <ProtectedRoute>
+      <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white relative overflow-hidden flex">
+        {/* Animated Background */}
+        <BackgroundEffects />
 
-      {/* Header */}
-      <Header />
+        {/* Sidebar */}
+        <Sidebar
+          currentSessionId={currentSessionId}
+          onNewChat={handleNewChat}
+          onSelectSession={handleSelectSession}
+        />
 
-      {/* Main Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 space-y-12">
-        {/* Hero Section */}
-        <Hero />
+        {/* Main Content */}
+        <div className="flex-1 ml-[280px] relative z-10">
+          {/* Top Right User Menu */}
+          {user && (
+            <div className="absolute top-6 right-6 flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                {user.picture ? (
+                  <img
+                    src={user.picture}
+                    alt={user.name}
+                    className="w-8 h-8 rounded-full ring-2 ring-gray-500/20"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center">
+                    <UserIcon className="w-4 h-4 text-white" />
+                  </div>
+                )}
+                <div className="hidden sm:block">
+                  <p className="text-xs font-medium text-white">{user.name}</p>
+                  <p className="text-[10px] text-gray-400">{user.email}</p>
+                </div>
+              </div>
+              <motion.button
+                type="button"
+                onClick={handleLogout}
+                className="p-2 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/50 rounded-lg transition-colors text-gray-300"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="Sign out"
+              >
+                <LogOut className="w-5 h-5" />
+              </motion.button>
+            </div>
+          )}
 
-        {/* Query Input */}
-        <QueryInput onSubmit={handleQuery} isLoading={isLoading} />
-
-        {/* Error Display */}
-        <ErrorMessage message={error} />
-
-        {/* Routing Visualization */}
-        {(isLoading || currentResponse) && (
-          <RoutingVisualization
-            response={currentResponse!}
-            isLoading={isLoading}
-          />
-        )}
-
-        {/* Response Display */}
-        {currentResponse && !isLoading && (
-          <ResponseDisplay response={currentResponse} />
-        )}
-
-        {/* Flow Diagram */}
-        {currentResponse && !isLoading && (
-          <FlowDiagram response={currentResponse} />
-        )}
-
-        {/* Cost Dashboard */}
-        {responses.length > 0 && (
-          <div className="pt-8 border-t border-gray-800/50">
-            <CostDashboard responses={responses} />
+          <div className="max-w-6xl mx-auto px-6 py-6">
+            <ChatInterface
+              sessionId={currentSessionId}
+              onSessionChange={setCurrentSessionId}
+            />
           </div>
-        )}
-
-        {/* Statistics */}
-        {responses.length > 0 && (
-          <div className="pt-8">
-            <Statistics responses={responses} />
-          </div>
-        )}
-
-        {/* Feature Cards */}
-        {responses.length === 0 && <Features />}
-      </div>
-
-      {/* Footer */}
-      <Footer />
-    </main>
+        </div>
+      </main>
+    </ProtectedRoute>
   );
 }
