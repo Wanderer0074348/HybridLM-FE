@@ -19,15 +19,18 @@ ENV NODE_ENV=production
 
 RUN bun run build
 
-# Production image - use Node.js for Next.js server
-FROM node:23-alpine AS runner
+# Production image - use Bun for runtime
+FROM oven/bun:1-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Copy node_modules from builder
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy public folder
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
@@ -47,4 +50,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["bun", "run", "start"]
