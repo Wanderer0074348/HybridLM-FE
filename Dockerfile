@@ -1,12 +1,11 @@
-FROM node:23-alpine AS base
+FROM oven/bun:1-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci --legacy-peer-deps
+COPY package.json ./
+RUN bun install --no-save
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -18,10 +17,10 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build
+RUN bun run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# Production image - use Node.js for Next.js server
+FROM node:23-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
