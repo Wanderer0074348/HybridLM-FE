@@ -19,9 +19,12 @@ ENV NODE_ENV=production
 
 RUN bun run build
 
-# Production image - use Bun for runtime
+# Production image - use Bun with Node.js installed
 FROM oven/bun:1-alpine AS runner
 WORKDIR /app
+
+# Install Node.js
+RUN apk add --no-cache nodejs
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
